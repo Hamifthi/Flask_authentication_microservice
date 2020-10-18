@@ -39,8 +39,37 @@ class User(db.Model):
     def decode_auth_token(auth_token):
         try:
             payload = jwt.decode(auth_token, Config.SECRET_KEY)
-            return payload['sub']
+            is_deprecated = DeprecatedToken.check_deprecated(auth_token)
+            if is_deprecated:
+                return 'Token deprecated. Please log in again.'
+            else:
+                return payload['sub']
         except jwt.ExpiredSignatureError:
             return 'Signature expired. Please login again'
         except jwt.InvalidTokenError:
             return 'Invalid token. Please log in again.'
+
+
+class DeprecatedToken(db.Model):
+    """
+    Token Model for storing JWT tokens
+    """
+    __tablename__ = 'deprecated_tokens'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    token = db.Column(db.String(500), unique=True, nullable=False)
+    deprecated_on = db.Column(db.DateTime, nullable=False, default=datetime.now())
+
+    def __init__(self, token):
+        self.token = token
+
+    def __repr__(self):
+        return '<id: token: {}'.format(self.token)
+
+    @staticmethod
+    def check_deprecated(token):
+        is_deprecated = DeprecatedToken.query.filter(token=token).first()
+        if is_deprecated:
+            return True
+        else:
+            return False
