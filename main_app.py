@@ -5,7 +5,10 @@ from flask_bcrypt import Bcrypt
 from flask import request
 from flask import make_response
 from flask import jsonify
-from models import User, DeprecatedToken
+from flask import redirect
+from flask_login import login_user, logout_user, current_user, login_required
+# from models import User, DeprecatedToken
+from oauth_provider import OAuthSignIn
 import config
 
 app = Flask(__name__)
@@ -153,6 +156,53 @@ def logout():
             'message': 'Auth token is invalid'
         }
         make_response(jsonify(response)), 403
+
+
+@app.route('/v1/authorize/<provider>')
+def authorize_provider(provider):
+    if not current_user.is_anonymous():
+        response = {
+            'status': 'Failure',
+            'message': 'You may log in before please log out first'
+        }
+        return make_response(jsonify(response)), 403
+    oauth = OAuthSignIn.get_provider(provider)
+    return oauth.authorize()
+
+
+@app.route('/v1/callback/<provider>')
+def oauth_callback(provider):
+    if not current_user.is_anonymous():
+        response = {
+            'status': 'Failure',
+            'message': 'You may log in before please log out first'
+        }
+        return make_response(jsonify(response)), 403
+    oauth = OAuthSignIn.get_provider(provider)
+    username, email = oauth.callback()
+    if email is None:
+        # I need a valid email address for my user identification
+        response = {
+            'status': 'Failure',
+            'message': 'Need A valid email'
+        }
+        return make_response(jsonify(response)), 400
+    # Look if the user already exists
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        # We can do more work here to ensure a unique nickname, if you
+        # require that.
+        user = User(email=email)
+        db.session.add(user)
+        db.session.commit()
+    # Log in the user, by default remembering them for their next visit
+    # unless they log out.
+    login_user(user, remember=True)
+    response = {
+            'status': 'Success',
+            'message': 'User logged in successfully'
+        }
+    return make_response(jsonify(response)), 200
 
 
 if __name__ == '__main__':

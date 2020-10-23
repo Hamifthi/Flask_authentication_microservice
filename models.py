@@ -8,8 +8,9 @@ from config import Config
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    email = db.Column(db.String(255), unique=True, nullable=True)
-    password = db.Column(db.String(255), nullable=False)
+    social_id = db.Column(db.String(64), nullable=True, unique=True)
+    email = db.Column(db.String(255), unique=True, nullable=False)
+    password = db.Column(db.String(255), nullable=True)
     registration_date = db.Column(db.DateTime, nullable=False, default=datetime.now())
     admin = db.Column(db.Boolean, nullable=False, default=False)
 
@@ -17,7 +18,6 @@ class User(db.Model):
         self.email = email
         self.password = bcrypt.generate_password_hash(password, app.config["BCRYPT_ROUND"]).decode()
         self.admin = admin
-
 
     @staticmethod
     def encode_auth_token(user_id):
